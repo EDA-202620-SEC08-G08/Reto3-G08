@@ -275,7 +275,43 @@ def print_req_2(control):
         Función que imprime la solución del Requerimiento 2 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 2
-    pass
+    if not is_loaded(control):
+        return
+
+    country = input("Nombre del país: ").strip()
+    rating_min = read_float("Calificación mínima: ")
+    rating_max = read_float("Calificación máxima: ")
+
+    result = logic.req_2(
+        control,
+        country,
+        rating_min,
+        rating_max
+    )
+
+    print("\nREQUERIMIENTO 2")
+    print(f"Tiempo de ejecución: {result['time']:.2f} ms")
+    print(f"Total de órdenes: {result['total']}")
+    print(f"Costo total final (USD): {result['total_cost']:.2f}")
+
+    if result["total"] == 0:
+        print("\nNo se encontraron órdenes.\n")
+        return
+
+    fields = [
+        ("order_id", "Identificador de la orden"),
+        ("order_date", "Fecha de la orden"),
+        ("brand", "Marca"),
+        ("model_name", "Modelo"),
+        ("country", "País"),
+        ("sales_channel", "Canal de venta"),
+        ("customer_rating", "Calificación del cliente"),
+        ("final_price_usd", "Precio final (USD)"),
+        ("revenue_usd", "Ingresos totales"),
+    ]
+
+    print_first_last(result["orders"], fields)
+    print()
 
 
 def print_req_3(control):
@@ -299,7 +335,45 @@ def print_req_5(control):
         Función que imprime la solución del Requerimiento 5 en consola
     """
     # TODO: Imprimir el resultado del requerimiento 5
-    pass
+    if not is_loaded(control):
+        return
+
+    country = input("Nombre del país: ").strip()
+    date_start = read_date("Fecha inicial (AAAA-MM-DD): ")
+    date_end = read_date("Fecha final (AAAA-MM-DD): ")
+    n = read_int("Cantidad N de marcas: ")
+
+    result = logic.req_5(control, country, date_start, date_end, n)
+
+    print("\nREQUERIMIENTO 5")
+    print(f"Tiempo de ejecución: {result['time']:.2f} ms")
+    print(f"Número de marcas consideradas: {result['total_brands']}")
+
+    if result["total_brands"] == 0:
+        print("\nNo se encontraron marcas.\n")
+        return
+
+    for i in range(al.size(result["brands"])):
+        brand = al.get_element(result["brands"], i)
+        sale = brand["max_units_sale"]
+
+        print(f"\nMARCA {i + 1}")
+        print(f"Nombre de la marca: {brand['brand']}")
+        print(f"Total de órdenes: {brand['count']}")
+        print(f"Calificación promedio: {brand['rating_avg']:.4f}")
+        print(f"Ingreso generado promedio (USD): {brand['revenue_avg']:.2f}")
+
+        print("\nOrden con mayor número de unidades vendidas:")
+        print(f"Identificador: {sale['order_id']}")
+        print(f"Fecha: {sale['order_date']}")
+        print(f"Marca: {sale['brand']}")
+        print(f"Modelo: {sale['model_name']}")
+        print(f"País: {sale['country']}")
+        print(f"Canal de venta: {sale['sales_channel']}")
+        print(f"Unidades vendidas: {sale['units_sold']}")
+        print(f"Calificación del cliente: {sale['customer_rating']:.2f}")
+
+    print()
 
 
 def print_req_6(control):
