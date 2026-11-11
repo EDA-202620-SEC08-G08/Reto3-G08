@@ -23,8 +23,9 @@ def new_logic():
         "sales": al.new_list(),
         # marca (minúscula) -> RBT {discount_percent -> lista de ventas}  (REQ 1)
         "brand_discount": mlp.new_map(20, 0.5),
-        # RBT {order_date "AAAA-MM-DD" -> lista de ventas}  (REQ 4, 5, 6)
+        # RBT {customer_rating -> lista de ventas}  (REQ 2)
         "country_rating": mlp.new_map(40,0.5),
+        # RBT {order_date "AAAA-MM-DD" -> lista de ventas}  (REQ 4, 5, 6)
         "dates": rbt.new_map(),
         # Venta con menor y mayor precio final (se calculan durante la carga)
         "min_sale": None,
@@ -93,13 +94,13 @@ def add_sale(catalog, sale):
         mlp.put(catalog["brand_discount"], brand_key, tree)
     add_to_tree_list(tree, sale["discount_percent"], sale)
     
-    # Índice por país y calificación
+    # Índice por país -> RBT por calificación
     country_key = sale["country"].strip().lower()
-    rating_tree = mlp.get(catalog["country_rating"],country_key)
+    rating_tree = mlp.get(catalog["country_rating"], country_key)
     if rating_tree is None:
-       rating_tree = rbt.new_map()
-       mlp.put(catalog["country_rating"],country_key,rating_tree )
-    add_to_tree_list(rating_tree,sale["customer_rating"],sale)
+        rating_tree = rbt.new_map()
+        mlp.put(catalog["country_rating"], country_key, rating_tree)
+    add_to_tree_list(rating_tree, sale["customer_rating"], sale)
 
     # Índice por fecha
     add_to_tree_list(catalog["dates"], sale["order_date"], sale)
@@ -191,8 +192,7 @@ def req_1(catalog, brand, discount_min, discount_max):
 
 def sort_crit_req_2(sale1, sale2):
     """
-    Calificación descendente.
-    En empate, fecha descendente.
+    Descendente por calificación; empate -> fecha más reciente primero.
     """
 
     if sale1["customer_rating"] != sale2["customer_rating"]:
@@ -203,29 +203,22 @@ def sort_crit_req_2(sale1, sale2):
 
 def req_2(catalog, country, rating_min, rating_max):
     """
-    Retorna el resultado del requerimiento 2
+    Retorna el resultado del requerimiento 2: órdenes de un país con
+    calificación del cliente dentro de [rating_min, rating_max].
     """
-    # TODO: Modificar el requerimiento 2
     start = get_time()
 
     result = al.new_list()
     total_cost = 0.0
 
-    country_key = country.strip().lower()
-
-    tree = mlp.get(catalog["country_rating"], country_key)
+    tree = mlp.get(catalog["country_rating"], country.strip().lower())
 
     if tree is not None and rating_min <= rating_max:
-
-        buckets = rbt.values(
-            tree,
-            float(rating_min),
-            float(rating_max)
-        )
-
+        # Rango en el RBT: listas de ventas con calificación en [min,max]
+        buckets = rbt.values(tree, float(rating_min), float(rating_max))
         for i in range(al.size(buckets)):
             bucket = al.get_element(buckets, i)
-
+            
             for j in range(al.size(bucket)):
                 sale = al.get_element(bucket, j)
 
@@ -258,7 +251,7 @@ def req_4(catalog):
     # TODO: Modificar el requerimiento 4
     pass
 
-def compare_req_5(parent, child):
+def sort_crit_req_5(parent, child):
     """
     Mayor calificación promedio primero.
     En empate, marca alfabéticamente ascendente.
@@ -273,21 +266,16 @@ def compare_req_5(parent, child):
 
 def req_5(catalog, country, date_start, date_end, n):
     """
-    Retorna el resultado del requerimiento 5
+    Retorna el resultado del requerimiento 5: las N marcas con mejor
+    calificación promedio en un país y un rango de fechas.
     """
-    # TODO: Modificar el requerimiento 5
     start = get_time()
-
-    brands = mlp.new_map(20, 0.5)
+    country_key = country.strip().lower()
 
     # 1. Filtrar las órdenes por fecha y país
+    brands = mlp.new_map(20, 0.5)
     if date_start <= date_end:
-
-        buckets = rbt.values(
-            catalog["dates"],
-            date_start,
-            date_end
-        )
+        buckets = rbt.values(catalog["dates"], date_start, date_end)
 
         for i in range(al.size(buckets)):
             bucket = al.get_element(buckets, i)
@@ -295,8 +283,7 @@ def req_5(catalog, country, date_start, date_end, n):
             for j in range(al.size(bucket)):
                 sale = al.get_element(bucket, j)
 
-                if sale["country"].strip().lower() == country.strip().lower():
-
+                if sale["country"].strip().lower() == country_key:
                     brand_name = sale["brand"]
                     stats = mlp.get(brands, brand_name)
 
@@ -315,7 +302,7 @@ def req_5(catalog, country, date_start, date_end, n):
                     stats["rating_sum"] += sale["customer_rating"]
                     stats["revenue_sum"] += sale["revenue_usd"]
 
-                    # Orden con mayor número de unidades vendidas
+                    # Mayor número de unidades; empate -> mayor order_id
                     current = stats["max_units_sale"]
 
                     if (current is None or sale["units_sold"] > current["units_sold"] 
@@ -324,8 +311,8 @@ def req_5(catalog, country, date_start, date_end, n):
                         
                         stats["max_units_sale"] = sale
 
-    # 2. Calcular los promedios de cada marca
-    heap = pq.new_heap(cmp_function=compare_req_5)
+    # 2. Promedios por marca y cola de prioridad
+    heap = pq.new_heap(cmp_function=sort_crit_req_5)
 
     brand_names = mlp.key_set(brands)
 
@@ -333,20 +320,13 @@ def req_5(catalog, country, date_start, date_end, n):
         name = al.get_element(brand_names, i)
         stats = mlp.get(brands, name)
 
-        stats["rating_avg"] = (
-            stats["rating_sum"] / stats["count"]
-        )
-
-        stats["revenue_avg"] = (
-            stats["revenue_sum"] / stats["count"]
-        )
-
-        priority = (stats["rating_avg"], name)
-
+        stats["rating_avg"] = (stats["rating_sum"] / stats["count"])
+        stats["revenue_avg"] = (stats["revenue_sum"] / stats["count"])
+        priority = (round(stats["rating_avg"], 6), name)
         pq.insert(heap, priority, stats)
 
+    # 3. Extraer las N mejor calificadas 
     result = al.new_list()
-
     while not pq.is_empty(heap) and al.size(result) < n:
         al.add_last(result, pq.remove(heap))
 
