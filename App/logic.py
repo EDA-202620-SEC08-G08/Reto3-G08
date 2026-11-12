@@ -27,6 +27,8 @@ def new_logic():
         "country_rating": mlp.new_map(40,0.5),
         # RBT {order_date "AAAA-MM-DD" -> lista de ventas}  (REQ 4, 5, 6)
         "dates": rbt.new_map(),
+        # RBT {final_price_usd -> lista de ventas}  (REQ 3)
+        "channel_category_price": mlp.new_map(20, 0.5),
         # Venta con menor y mayor precio final (se calculan durante la carga)
         "min_sale": None,
         "max_sale": None,
@@ -102,6 +104,14 @@ def add_sale(catalog, sale):
         mlp.put(catalog["country_rating"], country_key, rating_tree)
     add_to_tree_list(rating_tree, sale["customer_rating"], sale)
 
+    # Índice canal + categoría -> RBT por precio final
+    cc_key = sale["sales_channel"].strip().lower() + "|" + sale["category"].strip().lower()
+    price_tree = mlp.get(catalog["channel_category_price"], cc_key)
+    if price_tree is None:
+        price_tree = rbt.new_map()
+        mlp.put(catalog["channel_category_price"], cc_key, price_tree)
+    add_to_tree_list(price_tree, sale["final_price_usd"], sale)
+    
     # Índice por fecha
     add_to_tree_list(catalog["dates"], sale["order_date"], sale)
 
@@ -255,7 +265,7 @@ def req_3(catalog, channel, category, price_min, price_max):
     result = al.new_list()
     total_cost = 0.0
  
-    cc_key = channel_category_key(channel, category)
+    cc_key = channel.strip().lower() + "|" + category.strip().lower()
     tree = mlp.get(catalog["channel_category_price"], cc_key)
     if tree is not None and price_min <= price_max:
         buckets = rbt.values(tree, float(price_min), float(price_max))
@@ -290,7 +300,7 @@ def sort_crit_req_4(parent, child):
     return p1[1] <= p2[1]
 
 
-def req_4(catalog):
+def req_4(catalog, date_start, date_end, income_level, n):
     """
     Retorna el resultado del requerimiento 4
     """
