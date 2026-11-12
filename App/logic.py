@@ -235,21 +235,130 @@ def req_2(catalog, country, rating_min, rating_max):
         "total_cost": total_cost,
         "orders": result,
     }
+    
+def sort_crit_req_3(sale1, sale2):
+    """
+    Ascendente por precio final; empate -> fecha mas antigua primero;
+    empate -> menor order_id.
+     """
+    if sale1["final_price_usd"] != sale2["final_price_usd"]:
+         return sale1["final_price_usd"] < sale2["final_price_usd"]
+    if sale1["order_date"] != sale2["order_date"]:
+        return sale1["order_date"] < sale2["order_date"]
+    return order_number(sale1["order_id"]) < order_number(sale2["order_id"])
 
-def req_3(catalog):
+def req_3(catalog, channel, category, price_min, price_max):
     """
     Retorna el resultado del requerimiento 3
     """
-    # TODO: Modificar el requerimiento 3
-    pass
+    start = get_time()
+    result = al.new_list()
+    total_cost = 0.0
+ 
+    cc_key = channel_category_key(channel, category)
+    tree = mlp.get(catalog["channel_category_price"], cc_key)
+    if tree is not None and price_min <= price_max:
+        buckets = rbt.values(tree, float(price_min), float(price_max))
+        for i in range(al.size(buckets)):
+            bucket = al.get_element(buckets, i)
+            for j in range(al.size(bucket)):
+                sale = al.get_element(bucket, j)
+                al.add_last(result, sale)
+                total_cost += sale["final_price_usd"]
+        al.merge_sort(result, sort_crit_req_3)
+ 
+    end = get_time()
+ 
+    return {
+        "time": delta_time(start, end),
+        "total": al.size(result),
+        "total_cost": total_cost,
+        "orders": result,
+    }
+    
+def sort_crit_req_4(parent, child):
+    """
+    Mayor número de órdenes primero.
+    En empate, marca alfabéticamente ascendente.
+    """
+    p1 = parent["priority"]
+    p2 = child["priority"]
+ 
+    if p1[0] != p2[0]:
+        return p1[0] > p2[0]
+ 
+    return p1[1] <= p2[1]
 
 
 def req_4(catalog):
     """
     Retorna el resultado del requerimiento 4
     """
-    # TODO: Modificar el requerimiento 4
-    pass
+    start = get_time()
+    income_key = income_level.strip().lower()
+ 
+
+    brands = mlp.new_map(20, 0.5)
+    if date_start <= date_end:
+        buckets = rbt.values(catalog["dates"], date_start, date_end)
+ 
+        for i in range(al.size(buckets)):
+            bucket = al.get_element(buckets, i)
+ 
+            for j in range(al.size(bucket)):
+                sale = al.get_element(bucket, j)
+ 
+                if sale["customer_income_level"].strip().lower() == income_key:
+                    brand_name = sale["brand"]
+                    stats = mlp.get(brands, brand_name)
+ 
+                    if stats is None:
+                        stats = {
+                            "brand": brand_name,
+                            "count": 0,
+                            "price_sum": 0.0,
+                            "revenue_sum": 0.0,
+                            "max_revenue_sale": None
+                        }
+ 
+                        mlp.put(brands, brand_name, stats)
+ 
+                    stats["count"] += 1
+                    stats["price_sum"] += sale["final_price_usd"]
+                    stats["revenue_sum"] += sale["revenue_usd"]
+ 
+                    current = stats["max_revenue_sale"]
+ 
+                    if (current is None or sale["revenue_usd"] > current["revenue_usd"]
+                        or (sale["revenue_usd"] == current["revenue_usd"]
+                            and sale["order_date"] > current["order_date"])):
+ 
+                        stats["max_revenue_sale"] = sale
+ 
+    heap = pq.new_heap(cmp_function=sort_crit_req_4)
+ 
+    brand_names = mlp.key_set(brands)
+ 
+    for i in range(al.size(brand_names)):
+        name = al.get_element(brand_names, i)
+        stats = mlp.get(brands, name)
+ 
+        stats["price_avg"] = (stats["price_sum"] / stats["count"])
+        stats["revenue_avg"] = (stats["revenue_sum"] / stats["count"])
+        priority = (stats["count"], name)
+        pq.insert(heap, priority, stats)
+ 
+    result = al.new_list()
+    while not pq.is_empty(heap) and al.size(result) < n:
+        al.add_last(result, pq.remove(heap))
+ 
+    end = get_time()
+ 
+    return {
+        "time": delta_time(start, end),
+        "total_brands": al.size(result),
+        "brands": result,
+    }
 
 def sort_crit_req_5(parent, child):
     """

@@ -315,18 +315,85 @@ def print_req_2(control):
 
 def print_req_3(control):
     """
-        Función que imprime la solución del Requerimiento 3 en consola
+        Funcion que imprime la solucion del Requerimiento 3 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 3
-    pass
+    if not is_loaded(control):
+        return
+    channel = input("Canal de venta (Online / Retail Store): ").strip()
+    category = input("Categoria del producto: ").strip()
+    p_min = read_float("Precio final minimo (USD): ")
+    p_max = read_float("Precio final maximo (USD): ")
+ 
+    result = logic.req_3(control, channel, category, p_min, p_max)
+ 
+    print(f"\nREQUERIMIENTO 3: canal {channel}, categoria {category}, "
+          f"precio final entre {p_min} y {p_max}")
+    print(f"Tiempo de ejecucion: {result['time']:.2f} milisegundos")
+    print(f"Total de ordenes que cumplen el filtro: {result['total']}")
+    print(f"Costo total final (USD): {result['total_cost']:.2f}")
+ 
+    if result["total"] == 0:
+        print("\nNo se encontraron ordenes con esos criterios.\n")
+        return
+ 
+    fields = [
+        ("order_id", "order_id"),
+        ("order_date", "Fecha de la orden"),
+        ("brand", "Marca"),
+        ("model_name", "Modelo"),
+        ("category", "Categoria"),
+        ("sales_channel", "Canal de venta"),
+        ("country", "Pais"),
+        ("final_price_usd", "Precio final (USD)"),
+        ("units_sold", "Unidades vendidas"),
+    ]
+    print_first_last(result["orders"], fields)
+    print()
 
 
 def print_req_4(control):
     """
-        Función que imprime la solución del Requerimiento 4 en consola
+        Funcion que imprime la solucion del Requerimiento 4 en consola
     """
-    # TODO: Imprimir el resultado del requerimiento 4
-    pass
+    if not is_loaded(control):
+        return
+ 
+    date_start = read_date("Fecha inicial (AAAA-MM-DD): ")
+    date_end = read_date("Fecha final (AAAA-MM-DD): ")
+    income_level = input("Nivel de ingresos del cliente (Low / Medium / High): ").strip()
+    n = read_int("Cantidad N de marcas: ")
+ 
+    result = logic.req_4(control, date_start, date_end, income_level, n)
+ 
+    print(f"\nREQUERIMIENTO 4: fechas entre {date_start} y {date_end}, "
+          f"nivel de ingresos {income_level}, N = {n}")
+    print(f"Tiempo de ejecucion: {result['time']:.2f} milisegundos")
+    print(f"Número de marcas consideradas: {result['total_brands']}")
+ 
+    if result["total_brands"] == 0:
+        print("\nNo se encontraron marcas.\n")
+        return
+ 
+    for i in range(al.size(result["brands"])):
+        brand = al.get_element(result["brands"], i)
+        sale = brand["max_revenue_sale"]
+ 
+        print(f"\nMARCA {i + 1}")
+        print(f"Nombre de la marca: {brand['brand']}")
+        print(f"Total de ordenes: {brand['count']}")
+        print(f"Precio final promedio (USD): {brand['price_avg']:.2f}")
+        print(f"Ingreso generado promedio (USD): {brand['revenue_avg']:.2f}")
+ 
+        print("\nOrden con mayor ingreso generado:")
+        print(f"Identificador: {sale['order_id']}")
+        print(f"Fecha: {sale['order_date']}")
+        print(f"Marca y modelo: {sale['brand']} - {sale['model_name']}")
+        print(f"Pais: {sale['country']}")
+        print(f"Canal de venta: {sale['sales_channel']}")
+        print(f"Precio final (USD): {sale['final_price_usd']:.2f}")
+        print(f"Ingreso generado (USD): {sale['revenue_usd']:.2f}")
+ 
+    print()
 
 
 def print_req_5(control):
